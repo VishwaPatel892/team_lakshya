@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>LAKSHYA Voice Permission</title>
+  <style>
+    body {
+      background-color: #0d0e14;
+      color: #f3f4f6;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .container {
+      max-width: 400px;
+      padding: 35px 30px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      background: #12141c;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .icon {
+      font-size: 52px;
+      margin-bottom: 24px;
+      color: #06b6d4;
+      animation: pulse 2s infinite ease-in-out;
+    }
+    h2 {
+      margin-top: 0;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    p {
+      color: #9ca3af;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    button {
+      background: linear-gradient(135deg, #06b6d4 0%, #6366f1 100%);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(6, 182, 212, 0.5);
+      filter: brightness(1.05);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🎙️</div>
+    <h2>Enable Voice Assistant</h2>
+    <p>LAKSHYA needs microphone access to let you ask questions and talk to the companion. Click the button below to grant permission, then you can close this tab.</p>
+    <button id="grant-btn">Allow Microphone Access</button>
+  </div>
+  <script src="permission.js"></script>
+</body>
+</html>

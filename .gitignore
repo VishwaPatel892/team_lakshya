@@ -1,0 +1,28 @@
+# Dependency directories
+node_modules/
+
+# Local configuration files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+
+# Production build outputs
+extension/dist/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Docker data / local volume mounts
+.chroma/
+chroma_data/
+backend/data/
+
+# OS specific files
+.DS_Store
+Thumbs.db
