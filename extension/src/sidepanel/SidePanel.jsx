@@ -8,7 +8,7 @@ import SettingsModal from '../components/SettingsModal';
 import VoiceController from '../components/VoiceController';
 import { 
   Bot, Plus, Settings, MessageSquare, Send, 
-  Sparkles, RefreshCw, BookOpen, Globe 
+  Sparkles, RefreshCw, BookOpen, Globe, X 
 } from 'lucide-react';
 
 export default function SidePanel() {
@@ -325,6 +325,13 @@ export default function SidePanel() {
               title="Settings"
             >
               <Settings size={14} />
+            </button>
+            <button 
+              onClick={() => window.close()}
+              className="sp-action-btn close-panel-btn"
+              title="Close Panel"
+            >
+              <X size={14} />
             </button>
           </div>
         </div>

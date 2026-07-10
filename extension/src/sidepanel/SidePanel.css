@@ -113,6 +113,12 @@ body {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.sp-action-btn.close-panel-btn:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
 /* Header select layouts */
 .sp-header-bar {
   display: flex;
