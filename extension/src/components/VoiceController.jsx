@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import voice from '../utils/voice';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
-import { Mic, MicOff, Volume2, VolumeX, Square } from 'lucide-react';
+import { Mic, Square } from 'lucide-react';
 
-export default function VoiceController({ settingsConfig, onSpeechInput, isAssistantStreaming }) {
+export default function VoiceController({ settingsConfig, onSpeechInput, isAssistantStreaming, stopSignal = 0 }) {
   const [listeningState, setListeningState] = useState('idle'); // 'idle', 'listening', 'recording', 'transcribing'
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +31,13 @@ export default function VoiceController({ settingsConfig, onSpeechInput, isAssis
       voice.stopSpeaking();
     };
   }, []);
+
+  useEffect(() => {
+    if (stopSignal > 0) {
+      stop();
+      setListeningState('idle');
+    }
+  }, [stopSignal]);
 
   const handleToggleListen = () => {
     setError('');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import settings from '../utils/settings';
 import voice from '../utils/voice';
@@ -8,7 +8,7 @@ import SettingsModal from '../components/SettingsModal';
 import VoiceController from '../components/VoiceController';
 import { 
   Bot, Plus, Settings, MessageSquare, Send, 
-  Sparkles, RefreshCw, BookOpen, Globe, X 
+  Sparkles, RefreshCw, BookOpen, Globe, X, FileText, Table, Paperclip 
 } from 'lucide-react';
 
 export default function SidePanel() {
@@ -26,6 +26,13 @@ export default function SidePanel() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [extractingPage, setExtractingPage] = useState(false);
   const [extractionStatus, setExtractionStatus] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [attachmentStatus, setAttachmentStatus] = useState('');
+  const [activeAttachment, setActiveAttachment] = useState(null);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [stopVoiceSignal, setStopVoiceSignal] = useState(0);
+  const pdfInputRef = useRef(null);
+  const spreadsheetInputRef = useRef(null);
 
   // 1. Initial Load
   useEffect(() => {
@@ -60,7 +67,7 @@ export default function SidePanel() {
       // Check for prompt on mount/refresh
       chrome.storage.local.get(['pendingPrompt'], (result) => {
         if (result.pendingPrompt) {
-          handleSendMessage(result.pendingPrompt);
+          setInputValue(result.pendingPrompt);
           chrome.storage.local.remove(['pendingPrompt']);
         }
       });
@@ -68,7 +75,7 @@ export default function SidePanel() {
       // Listen for real-time prompt injects while sidepanel is active
       const handleStorageChange = (changes, areaName) => {
         if (areaName === 'local' && changes.pendingPrompt?.newValue) {
-          handleSendMessage(changes.pendingPrompt.newValue);
+          setInputValue(changes.pendingPrompt.newValue);
           chrome.storage.local.remove(['pendingPrompt']);
         }
       };
@@ -108,6 +115,7 @@ export default function SidePanel() {
     if (isStreaming) return;
     voice.stopSpeaking();
     setActiveConvId(id);
+    setActiveAttachment(null);
     loadMessages(id);
   };
 
@@ -119,9 +127,88 @@ export default function SidePanel() {
       setConversations(prev => [newConv, ...prev]);
       setActiveConvId(newConv.id);
       setMessages([]);
+      setActiveAttachment(null);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const loadFileIntoChat = async ({ file, kind, parseFile, promptLabel, extensionCheck }) => {
+    if (!file || !backendOnline || uploadingFile || !appSettings) return;
+
+    if (!extensionCheck(file)) {
+      setAttachmentStatus(`Choose a ${kind} file.`);
+      setTimeout(() => setAttachmentStatus(''), 3000);
+      return;
+    }
+
+    setAttachmentMenuOpen(false);
+    setUploadingFile(true);
+    const storeInDb = appSettings?.savePdfToDb || false;
+    setAttachmentStatus(`Loading ${kind}...`);
+
+    try {
+      let targetConvId = activeConvId;
+      if (!targetConvId) {
+        const newConv = await api.createConversation(`${promptLabel}: ${file.name.substring(0, 18)}`, appSettings?.model);
+        targetConvId = newConv.id;
+        setActiveConvId(targetConvId);
+        setConversations(prev => [newConv, ...prev]);
+        setMessages([]);
+      }
+
+      const result = await parseFile(file, appSettings, storeInDb);
+
+      if (!storeInDb && result.text) {
+        await new Promise((resolve) => {
+          chrome.storage.local.set({
+            [`file_context_${targetConvId}`]: { title: file.name, text: result.text }
+          }, resolve);
+        });
+      }
+
+      const detailText = kind === 'spreadsheet'
+        ? `${result.sheets || 1} sheet(s), ${result.rows || 0} rows`
+        : `${result.pages || 1} page(s)`;
+      setActiveAttachment({
+        kind: promptLabel,
+        name: file.name,
+        detail: detailText
+      });
+      await loadConversations(appSettings);
+      setInputValue(current => current || `Summarize this ${kind}.`);
+      setAttachmentStatus(`${promptLabel} ready`);
+    } catch (err) {
+      console.error(err);
+      setAttachmentStatus(`${promptLabel} failed: ${err.message}`);
+    } finally {
+      setUploadingFile(false);
+      setTimeout(() => setAttachmentStatus(''), 5000);
+    }
+  };
+
+  const handlePdfUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    await loadFileIntoChat({
+      file,
+      kind: 'PDF',
+      promptLabel: 'PDF',
+      parseFile: api.ingestPdf,
+      extensionCheck: selectedFile => selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf')
+    });
+  };
+
+  const handleSpreadsheetUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    await loadFileIntoChat({
+      file,
+      kind: 'spreadsheet',
+      promptLabel: 'Spreadsheet',
+      parseFile: api.ingestSpreadsheet,
+      extensionCheck: selectedFile => /\.(xlsx|csv|tsv)$/i.test(selectedFile.name)
+    });
   };
 
   // 2. Extract and Ingest active tab's article content
@@ -201,6 +288,8 @@ export default function SidePanel() {
     if (!text.trim() || isStreaming || !backendOnline) return;
 
     setInputValue('');
+    setAttachmentMenuOpen(false);
+    setStopVoiceSignal(prev => prev + 1);
     voice.stopSpeaking();
 
     let currentConvId = activeConvId;
@@ -366,6 +455,7 @@ export default function SidePanel() {
             onChange={(e) => handleSelectConversation(e.target.value)}
             disabled={isStreaming || conversations.length === 0}
             className="sp-chat-selector"
+            title="Conversation"
           >
             {conversations.map(c => (
               <option key={c.id} value={c.id}>{c.title}</option>
@@ -423,25 +513,81 @@ export default function SidePanel() {
         </div>
 
         <div className="sp-input-wrapper">
-          <input
-            type="text"
+          {attachmentStatus && (
+            <div className="sp-attachment-status">
+              {uploadingFile ? <RefreshCw className="spin" size={12} /> : <Paperclip size={12} />}
+              <span>{attachmentStatus}</span>
+            </div>
+          )}
+          {activeAttachment && (
+            <div className="sp-active-attachment">
+              {activeAttachment.kind === 'PDF' ? <FileText size={14} /> : <Table size={14} />}
+              <div>
+                <strong>{activeAttachment.name}</strong>
+                <span>{activeAttachment.kind} loaded · {activeAttachment.detail}</span>
+              </div>
+            </div>
+          )}
+          <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSendMessage();
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
             }}
             placeholder="Ask LAKSHYA..."
             disabled={!backendOnline}
             className="sp-input-field"
+            rows={2}
           />
           <div className="sp-controls">
-            {appSettings && (
-              <VoiceController 
-                settingsConfig={appSettings} 
-                onSpeechInput={(transcript) => setInputValue(transcript)} 
-                isAssistantStreaming={isStreaming}
+            <div className="sp-left-controls">
+              <button
+                type="button"
+                onClick={() => setAttachmentMenuOpen(prev => !prev)}
+                disabled={uploadingFile || !backendOnline || !appSettings}
+                className={`sp-plus-btn ${attachmentMenuOpen ? 'active' : ''}`}
+                title="Add file"
+              >
+                <Plus size={16} />
+              </button>
+              {attachmentMenuOpen && (
+                <div className="sp-attachment-menu">
+                  <button type="button" onClick={() => pdfInputRef.current?.click()}>
+                    <FileText size={15} />
+                    <span>PDF</span>
+                  </button>
+                  <button type="button" onClick={() => spreadsheetInputRef.current?.click()}>
+                    <Table size={15} />
+                    <span>Excel / CSV</span>
+                  </button>
+                </div>
+              )}
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handlePdfUpload}
+                className="sp-hidden-file"
               />
-            )}
+              <input
+                ref={spreadsheetInputRef}
+                type="file"
+                accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"
+                onChange={handleSpreadsheetUpload}
+                className="sp-hidden-file"
+              />
+              {appSettings && (
+                <VoiceController 
+                  settingsConfig={appSettings} 
+                  onSpeechInput={(transcript) => setInputValue(transcript)} 
+                  isAssistantStreaming={isStreaming}
+                  stopSignal={stopVoiceSignal}
+                />
+              )}
+            </div>
             <button
               onClick={() => handleSendMessage()}
               disabled={!inputValue.trim() || isStreaming || !backendOnline}

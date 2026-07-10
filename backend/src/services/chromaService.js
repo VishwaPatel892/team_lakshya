@@ -237,30 +237,37 @@ const chromaService = {
   // Utility to split text into overlapping chunks
   chunkText(text, chunkSize = 1000, chunkOverlap = 200) {
     if (!text) return [];
+    const safeChunkSize = Math.max(1, chunkSize);
+    const safeChunkOverlap = Math.min(Math.max(0, chunkOverlap), safeChunkSize - 1);
     const chunks = [];
     let index = 0;
 
     while (index < text.length) {
       // Find a clean break point (like a newline or space) near target chunk size
-      let end = index + chunkSize;
+      let end = index + safeChunkSize;
       if (end < text.length) {
         const lastSpace = text.lastIndexOf(' ', end);
         const lastNewline = text.lastIndexOf('\n', end);
         const breakPoint = Math.max(lastSpace, lastNewline);
-        if (breakPoint > index + chunkSize / 2) {
+        if (breakPoint > index + safeChunkSize / 2) {
           end = breakPoint;
         }
       } else {
         end = text.length;
       }
 
-      chunks.push(text.slice(index, end).trim());
-      index = end - chunkOverlap;
-      
-      // Prevent infinite loop if chunkOverlap is >= chunkSize or progress stalls
-      if (index >= end) {
-        index = end;
+      if (end <= index) {
+        end = Math.min(index + safeChunkSize, text.length);
       }
+
+      chunks.push(text.slice(index, end).trim());
+
+      if (end >= text.length) {
+        break;
+      }
+
+      const nextIndex = end - safeChunkOverlap;
+      index = nextIndex > index ? nextIndex : index + 1;
     }
 
     return chunks.filter(c => c.length > 10); // Remove tiny junk chunks

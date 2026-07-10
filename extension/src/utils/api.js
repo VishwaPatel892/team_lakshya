@@ -86,7 +86,38 @@ const api = {
       method: 'POST',
       body: formData
     });
-    if (!res.ok) throw new Error('Failed to parse and index PDF');
+    if (!res.ok) {
+      let message = 'Failed to parse PDF';
+      try {
+        const err = await res.json();
+        message = err.error || err.message || message;
+      } catch {
+        message = await res.text() || message;
+      }
+      throw new Error(message);
+    }
+    return res.json();
+  },
+
+  async ingestSpreadsheet(file, config = {}, storeInDb = false) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('config', JSON.stringify(config));
+
+    const res = await fetch(`${BACKEND_URL}/api/ingest/spreadsheet?store=${storeInDb}`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      let message = 'Failed to parse spreadsheet';
+      try {
+        const err = await res.json();
+        message = err.error || err.message || message;
+      } catch {
+        message = await res.text() || message;
+      }
+      throw new Error(message);
+    }
     return res.json();
   },
 

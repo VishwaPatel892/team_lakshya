@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Bot, User, Volume2 } from 'lucide-react';
 import voice from '../utils/voice';
 
@@ -92,6 +92,15 @@ function parseMarkdown(text) {
         }
         lines[i] = tableClosePrefix + prefix + `<li>${content}</li>`;
       } 
+      // Headings: #, ##, ###...
+      else if (line.match(/^#{1,6}\s+(.+)/)) {
+        const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
+        const level = Math.min(headingMatch[1].length, 3);
+        let suffix = '';
+        if (inList) { suffix = '</ul>'; inList = false; }
+        if (inNumList) { suffix = '</ol>'; inNumList = false; }
+        lines[i] = tableClosePrefix + suffix + `<h${level} class="chat-heading chat-heading-${level}">${headingMatch[2]}</h${level}>`;
+      }
       else {
         let suffix = '';
         if (inList) { suffix = '</ul>'; inList = false; }
@@ -129,6 +138,7 @@ function parseMarkdown(text) {
 
 export default function ChatWindow({ messages, isStreaming, settingsConfig }) {
   const containerRef = useRef(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState(null);
 
   // Auto-scroll on new message content
   useEffect(() => {
@@ -161,7 +171,14 @@ export default function ChatWindow({ messages, isStreaming, settingsConfig }) {
   };
 
   // Speaks aloud the specific message text
-  const handleReadMessage = (text) => {
+  const handleReadMessage = (messageId, text) => {
+    if (speakingMessageId === messageId) {
+      voice.stopSpeaking();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    voice.stopSpeaking();
     voice.speak(
       text,
       {
@@ -170,8 +187,9 @@ export default function ChatWindow({ messages, isStreaming, settingsConfig }) {
         voiceName: settingsConfig.voiceName,
         voiceRate: settingsConfig.voiceRate
       },
-      () => console.log('Speaking message...'),
-      () => console.log('Message reading finished.')
+      () => setSpeakingMessageId(messageId),
+      () => setSpeakingMessageId(null),
+      () => setSpeakingMessageId(null)
     );
   };
 
@@ -213,9 +231,9 @@ export default function ChatWindow({ messages, isStreaming, settingsConfig }) {
                   </span>
                   {msg.role === 'assistant' && (
                     <button
-                      onClick={() => handleReadMessage(msg.content)}
-                      className="read-msg-btn"
-                      title="Read message aloud"
+                      onClick={() => handleReadMessage(msg.id || msg.timestamp, msg.content)}
+                      className={`read-msg-btn ${speakingMessageId === (msg.id || msg.timestamp) ? 'active' : ''}`}
+                      title={speakingMessageId === (msg.id || msg.timestamp) ? 'Stop reading' : 'Read message aloud'}
                     >
                       <Volume2 size={12} />
                     </button>

@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
+  const [stopVoiceSignal, setStopVoiceSignal] = useState(0);
 
   // 1. Initial Load settings and connect to backend
   useEffect(() => {
@@ -134,6 +135,7 @@ export default function Dashboard() {
     if (!text.trim() || isStreaming || !backendOnline) return;
 
     setInputValue('');
+    setStopVoiceSignal(prev => prev + 1);
     voice.stopSpeaking();
 
     let currentConvId = activeConvId;
@@ -258,7 +260,8 @@ export default function Dashboard() {
     const file = e.target.files[0];
     if (!file || !backendOnline) return;
 
-    if (file.type !== 'application/pdf') {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
       alert('Only PDF files are supported.');
       return;
     }
@@ -472,10 +475,11 @@ export default function Dashboard() {
             <div className="input-controls">
               {appSettings && (
                 <VoiceController 
-                  settingsConfig={appSettings} 
-                  onSpeechInput={(transcript) => setInputValue(transcript)} 
-                  isAssistantStreaming={isStreaming}
-                />
+                settingsConfig={appSettings} 
+                onSpeechInput={(transcript) => setInputValue(transcript)} 
+                isAssistantStreaming={isStreaming}
+                stopSignal={stopVoiceSignal}
+              />
               )}
               
               <button

@@ -99,6 +99,7 @@ app.post('/api/conversations/:id/messages', async (req, res) => {
 // --- Content Ingestion & Vector indexing ---
 app.post('/api/ingest/webpage', contentController.ingestWebpage);
 app.post('/api/ingest/pdf', upload.single('file'), contentController.ingestPdf);
+app.post('/api/ingest/spreadsheet', upload.single('file'), contentController.ingestSpreadsheet);
 
 // --- AI Model & Completion Management ---
 app.get('/api/models', aiController.listModels);

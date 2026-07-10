@@ -23,7 +23,7 @@ export default function Popup() {
 
   // Quick Summarize Webpage Action
   const handleQuickSummarize = async () => {
-    if (!backendOnline || loading) return;
+    if (!backendOnline || loading || !appSettings) return;
 
     setLoading(true);
     setSummary('');
@@ -67,6 +67,8 @@ export default function Popup() {
             await api.chatStream(
               promptMessages,
               { ...appSettings, ragEnabled: false }, // Direct summarize, bypass RAG
+              null,
+              null,
               (chunk) => {
                 generatedSummary += chunk;
                 setSummary(generatedSummary);
@@ -118,7 +120,7 @@ export default function Popup() {
       <div className="popup-body">
         <button 
           onClick={handleQuickSummarize}
-          disabled={loading || !backendOnline}
+          disabled={loading || !backendOnline || !appSettings}
           className={`popup-btn primary-btn ${loading ? 'loading' : ''}`}
         >
           {loading ? (

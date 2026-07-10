@@ -1,5 +1,6 @@
 const chromaService = require('../services/chromaService');
 const pdfService = require('../services/pdfService');
+const spreadsheetService = require('../services/spreadsheetService');
 
 const contentController = {
   // Ingest text extracted from webpage
@@ -72,6 +73,50 @@ const contentController = {
       });
     } catch (error) {
       console.error('PDF ingestion failed:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  },
+
+  async ingestSpreadsheet(req, res) {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No spreadsheet file uploaded.' });
+    }
+
+    try {
+      let config = {};
+      if (req.body.config) {
+        try {
+          config = JSON.parse(req.body.config);
+        } catch (e) {
+          console.warn('Failed to parse config from request form-data:', e);
+        }
+      }
+
+      const storeInDb = req.query.store !== 'false' && req.body.store !== 'false';
+      const spreadsheetData = spreadsheetService.parseSpreadsheet(req.file.buffer, req.file.originalname);
+
+      let chunksAdded = 0;
+      if (storeInDb) {
+        const metadata = {
+          source: 'spreadsheet',
+          title: req.file.originalname,
+          sheets: spreadsheetData.sheets,
+          rows: spreadsheetData.rows
+        };
+        const result = await chromaService.addDocument(spreadsheetData.text, metadata, 'lakshya_knowledge', config);
+        chunksAdded = result.chunksAdded;
+      }
+
+      return res.json({
+        success: true,
+        sheets: spreadsheetData.sheets,
+        rows: spreadsheetData.rows,
+        characters: spreadsheetData.text.length,
+        chunksAdded,
+        text: storeInDb ? undefined : spreadsheetData.text
+      });
+    } catch (error) {
+      console.error('Spreadsheet ingestion failed:', error);
       return res.status(500).json({ error: error.message });
     }
   }
