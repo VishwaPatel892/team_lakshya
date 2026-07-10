@@ -33,6 +33,26 @@ export default function SidePanel() {
   const [stopVoiceSignal, setStopVoiceSignal] = useState(0);
   const pdfInputRef = useRef(null);
   const spreadsheetInputRef = useRef(null);
+  const [imageInput, setImageInput] = useState(null);
+  const [imageName, setImageName] = useState('');
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImageInput(event.target.result); // Base64 data URL
+      setImageName(file.name);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ''; // Reset input
+  };
 
   // 1. Initial Load
   useEffect(() => {
