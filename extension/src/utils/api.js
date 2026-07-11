@@ -216,11 +216,11 @@ const api = {
   },
 
   // --- Study Mode Generation ---
-  async generateStudyMaterial(type, content, count = 5, config = {}, image = null) {
+  async generateStudyMaterial(type, content, count = 5, config = {}, image = null, url = null) {
     const res = await fetch(`${BACKEND_URL}/api/study/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, content, count, config, image })
+      body: JSON.stringify({ type, content, count, config, image, url })
     });
     if (!res.ok) {
       const err = await res.json();
