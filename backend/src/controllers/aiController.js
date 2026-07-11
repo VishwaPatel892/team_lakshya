@@ -118,6 +118,123 @@ Refer primarily to this document context to answer questions about the file.
         return res.status(500).json({ error: error.message });
       }
     }
+  },
+
+  // Generate structured study materials strictly from source content
+  async generateStudyMaterial(req, res) {
+    const { type, content, count = 5, config = {}, image = null } = req.body;
+
+    if ((!content || !content.trim()) && !image) {
+      return res.status(400).json({ error: 'No webpage or document content found. Please use Read Page Content or upload a document first.' });
+    }
+
+    try {
+      let prompt = '';
+      if (type === 'quiz') {
+        prompt = `Generate a quiz with exactly ${count} multiple-choice questions based ONLY on the supplied source text.
+CRITICAL RULES:
+- Do NOT use prior knowledge.
+- Do NOT use general internet knowledge.
+- Do NOT hallucinate.
+- Do NOT create assumptions.
+- Use ONLY the supplied content. Every question must be fully supported by facts explicitly stated in the source text.
+- If the source text does not contain enough information to generate ${count} accurate questions, generate only the maximum possible number of accurate questions based on the source text (even if it is 0, 1, or 2), and set the "limitedInfoNotice" field to: "Only X questions could be generated because the provided content contains limited information." (where X is the number of questions actually generated). Otherwise, leave "limitedInfoNotice" as null or empty.
+- Do NOT create fake questions just to reach the requested count.
+- Respond with a valid JSON object matching this structure EXACTLY. Ensure the output is strictly a parseable JSON object with no markdown wrappers or additional text:
+{
+  "limitedInfoNotice": "Only X questions could be generated because the provided content contains limited information." (or null if target count met),
+  "questions": [
+    {
+      "question": "question text",
+      "options": ["option A", "option B", "option C", "option D"],
+      "answer": "the exact string of the correct option",
+      "explanation": "why this option is correct based ONLY on the text"
+    }
+  ]
+}`;
+      } else if (type === 'flashcards') {
+        prompt = `Generate a list of flashcards (maximum ${count}) based ONLY on the concepts explicitly mentioned in the supplied source text.
+CRITICAL RULES:
+- Do NOT use prior knowledge or outside context.
+- Flashcards must contain key terms or questions on the front, and definitions or answers on the back, derived strictly from the text.
+- Respond with a valid JSON array matching this structure EXACTLY. Ensure the output is strictly a parseable JSON array with no markdown wrappers or additional text:
+[
+  {
+    "front": "concept or question",
+    "back": "explanation or definition based strictly on the text"
+  }
+]`;
+      } else if (type === 'notes') {
+        prompt = `Summarize and generate study notes based ONLY on the provided text.
+CRITICAL RULES:
+- Rely ONLY on the provided text. Summarize only what is explicitly stated.
+- Do NOT add extra explanations, external background, or outside knowledge not supported by the source.
+- Respond with a valid JSON object matching this structure EXACTLY. Ensure the output is strictly a parseable JSON object with no markdown wrappers or additional text:
+{
+  "summary": "a comprehensive structured summary of the text in markdown format",
+  "keyPoints": [
+    "important point 1 from text",
+    "important point 2 from text"
+  ]
+}`;
+      } else if (type === 'viva' || type === 'interview') {
+        prompt = `Generate a list of exactly ${count} ${type} questions and answers based ONLY on the provided text.
+CRITICAL RULES:
+- Do NOT use prior knowledge or external details. Questions must focus on concepts explicitly found in the source material.
+- If the source does not contain enough information to generate ${count} accurate questions, generate only the maximum possible number of accurate questions based on the source text, and set "limitedInfoNotice" to: "Only X questions could be generated because the provided content contains limited information." (where X is the number of questions generated). Otherwise, leave "limitedInfoNotice" as null or empty.
+- Do NOT create fake questions just to reach the requested count.
+- Respond with a valid JSON object matching this structure EXACTLY. Ensure the output is strictly a parseable JSON object with no markdown wrappers or additional text:
+{
+  "limitedInfoNotice": "Only X questions could be generated because the provided content contains limited information." (or null if target count met),
+  "questions": [
+    {
+      "question": "question text",
+      "answer": "answer text based strictly on the provided material"
+    }
+  ]
+}`;
+      } else {
+        return res.status(400).json({ error: 'Invalid study material type' });
+      }
+
+      const messages = [
+        { role: 'user', content: image ? [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: image } }
+        ] : `${prompt}\n\nSource Text:\n"""\n${content}\n"""` }
+      ];
+
+      const systemPrompt = `You are a helpful study companion. You must output raw JSON only. Do not write any markdown codeblocks, notes, or preamble outside the JSON. All JSON fields must be populated based strictly on the provided source content.`;
+
+      const rawResult = await llmService.getChatCompletion(
+        messages,
+        { ...config, systemPrompt }
+      );
+
+      // Try parsing JSON, stripping markdown codeblocks if LLM included them
+      let parsedData;
+      try {
+        let cleanJsonStr = rawResult.trim();
+        if (cleanJsonStr.startsWith('```')) {
+          cleanJsonStr = cleanJsonStr.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
+        }
+        parsedData = JSON.parse(cleanJsonStr.trim());
+      } catch (err) {
+        console.warn('Failed to parse LLM JSON directly. Raw result was:', rawResult);
+        const jsonMatch = rawResult.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsedData = JSON.parse(jsonMatch[0].trim());
+        } else {
+          throw err;
+        }
+      }
+
+      return res.json(parsedData);
+
+    } catch (error) {
+      console.error('Study material generation failed:', error);
+      return res.status(500).json({ error: 'Failed to generate study material: ' + error.message });
+    }
   }
 };
 

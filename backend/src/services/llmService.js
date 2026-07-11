@@ -176,6 +176,63 @@ const llmService = {
         res.end();
       }
     }
+  },
+
+  // Perform non-streaming completion for structured JSON
+  async getChatCompletion(messages, providerConfig) {
+    const { 
+      provider = 'local', 
+      apiKey = '', 
+      lmStudioUrl = 'http://localhost:1234/v1', 
+      model = '', 
+      systemPrompt = '' 
+    } = providerConfig;
+    
+    const resolvedUrl = resolveUrl(lmStudioUrl);
+    let targetUrl = '';
+    const headers = { 'Content-Type': 'application/json' };
+
+    const formattedMessages = [...messages];
+    if (systemPrompt && (!formattedMessages[0] || formattedMessages[0].role !== 'system')) {
+      formattedMessages.unshift({ role: 'system', content: systemPrompt });
+    }
+
+    if (provider === 'openrouter') {
+      if (!apiKey) {
+        throw new Error('OpenRouter API key is required');
+      }
+      targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      headers['HTTP-Referer'] = 'https://github.com/lakshya/browser-companion';
+      headers['X-Title'] = 'Lakshya AI Companion';
+    } else {
+      targetUrl = `${resolvedUrl.replace(/\/$/, '')}/chat/completions`;
+    }
+
+    const payload = {
+      model: model || (provider === 'openrouter' ? 'meta-llama/llama-3-8b-instruct:free' : 'local-model'),
+      messages: formattedMessages,
+      stream: false
+    };
+
+    console.log(`Sending non-streaming completion request to ${provider} using model: ${payload.model}`);
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`LLM service returned error: ${err}`);
+    }
+
+    const data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response structure from LLM service');
+    }
+    return data.choices[0].message.content;
   }
 };
 

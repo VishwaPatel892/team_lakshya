@@ -104,6 +104,7 @@ app.post('/api/ingest/spreadsheet', upload.single('file'), contentController.ing
 // --- AI Model & Completion Management ---
 app.get('/api/models', aiController.listModels);
 app.post('/api/chat', aiController.chat);
+app.post('/api/study/generate', aiController.generateStudyMaterial);
 
 // --- Vector Operations (Direct) ---
 app.post('/api/vector/search', vectorController.search);

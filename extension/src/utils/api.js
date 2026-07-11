@@ -213,6 +213,20 @@ const api = {
     });
     if (!res.ok) throw new Error('Failed to clear vector database');
     return res.json();
+  },
+
+  // --- Study Mode Generation ---
+  async generateStudyMaterial(type, content, count = 5, config = {}, image = null) {
+    const res = await fetch(`${BACKEND_URL}/api/study/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, content, count, config, image })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || err.message || 'Failed to generate study material');
+    }
+    return res.json();
   }
 };
 
