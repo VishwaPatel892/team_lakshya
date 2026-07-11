@@ -53,8 +53,76 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
   
+  else if (message.type === 'FILL_FORM') {
+    try {
+      const profileList = message.profile || [];
+      const profileMap = {};
+      profileList.forEach(item => {
+        if (item.key && item.key.trim()) {
+          profileMap[item.key.toLowerCase().trim()] = item.value;
+        }
+      });
+
+      const inputs = document.querySelectorAll('input, select, textarea');
+      let filledCount = 0;
+
+      inputs.forEach(input => {
+        if (input.type === 'hidden' || input.disabled || input.readOnly) return;
+
+        const nameAttr = (input.getAttribute('name') || '').toLowerCase().trim();
+        const idAttr = (input.getAttribute('id') || '').toLowerCase().trim();
+        const placeholderAttr = (input.getAttribute('placeholder') || '').toLowerCase().trim();
+        const labelText = getAssociatedLabelText(input).toLowerCase().trim();
+
+        let matchedValue = null;
+        for (const [key, val] of Object.entries(profileMap)) {
+          const cleanKey = key.toLowerCase().trim();
+          if (
+            nameAttr.includes(cleanKey) ||
+            idAttr.includes(cleanKey) ||
+            placeholderAttr.includes(cleanKey) ||
+            labelText.includes(cleanKey) ||
+            cleanKey.replace(/[^a-z0-9]/g, '').includes(nameAttr.replace(/[^a-z0-9]/g, '')) ||
+            nameAttr.replace(/[^a-z0-9]/g, '').includes(cleanKey.replace(/[^a-z0-9]/g, ''))
+          ) {
+            matchedValue = val;
+            break;
+          }
+        }
+
+        if (matchedValue !== null && matchedValue !== undefined) {
+          input.value = matchedValue;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          input.dispatchEvent(new Event('blur', { bubbles: true }));
+          filledCount++;
+        }
+      });
+
+      sendResponse({ success: true, filledCount });
+    } catch (error) {
+      console.error('LAKSHYA form filling failed:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+  
   return true; // Keep channel open for async responses
 });
+
+function getAssociatedLabelText(input) {
+  if (input.id) {
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    if (label) return label.innerText;
+  }
+  const parentLabel = input.closest('label');
+  if (parentLabel) return parentLabel.innerText;
+
+  const prev = input.previousElementSibling;
+  if (prev && (prev.tagName === 'LABEL' || prev.tagName === 'SPAN')) {
+    return prev.innerText;
+  }
+  return '';
+}
 
 // --- LAKSHYA Floating Action Button (FAB) & Selection Tooltip Injection ---
 

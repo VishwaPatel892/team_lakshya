@@ -8,7 +8,7 @@ import SettingsModal from '../components/SettingsModal';
 import VoiceController from '../components/VoiceController';
 import { 
   Bot, Plus, Settings, MessageSquare, Trash2, Send, 
-  FileText, Server, AlertCircle, Sparkles, BookOpen, Camera, X, Table, Paperclip, RefreshCw, Video
+  FileText, Server, AlertCircle, Sparkles, BookOpen, Camera, X, Table, Paperclip, RefreshCw, Video, Zap
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -272,6 +272,74 @@ export default function Dashboard() {
         setConversations(prev => [newConv, ...prev]);
       }
 
+      // Check if user is requesting a form fill action
+      const cleanText = text.toLowerCase().trim();
+      const isFormFillRequest = cleanText.includes('fill this form') || 
+                                cleanText.includes('fill the form') || 
+                                cleanText.includes('autofill') ||
+                                cleanText.includes('auto fill');
+
+      if (isFormFillRequest) {
+        let filledCount = 0;
+        let errorOccurred = false;
+        try {
+          if (typeof chrome !== 'undefined' && chrome.tabs) {
+            const [tab] = await new Promise((resolve) => {
+              chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+            });
+            if (tab && tab.id) {
+              const response = await new Promise((resolve) => {
+                chrome.tabs.sendMessage(tab.id, {
+                  type: 'FILL_FORM',
+                  profile: appSettings?.formProfile || []
+                }, (res) => {
+                  if (chrome.runtime.lastError) resolve(null);
+                  else resolve(res);
+                });
+              });
+              if (response && response.success) {
+                filledCount = response.filledCount;
+              }
+            }
+          }
+        } catch (err) {
+          console.error(err);
+          errorOccurred = true;
+        }
+
+        // Save user message to chat database
+        const dbText = imageInput ? `[Uploaded Image: ${imageName}] ${text}` : text;
+        const userMsg = await api.saveMessage(currentConvId, 'user', dbText);
+        
+        let responseText = '';
+        if (errorOccurred || typeof chrome === 'undefined' || !chrome.tabs) {
+          responseText = `⚠️ I was unable to access the active tab. Please make sure LAKSHYA is running inside the Chrome Extension sidepanel and you have active page permissions.`;
+        } else if (filledCount > 0) {
+          responseText = `⚡ **Auto-fill complete!** I scanned the active webpage form elements and successfully filled out **${filledCount}** field(s) using your custom variables profile (such as \`rollNo = 108\`).`;
+        } else {
+          responseText = `🔍 I scanned the active webpage form elements but could not find any input fields matching the keys in your profile (e.g. name, email, rollNo). You can add custom keys under **Settings** to match this form!`;
+        }
+
+        const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
+        
+        // Refresh message logs in UI view
+        const history = await api.getConversationMessages(currentConvId);
+        setMessages(history);
+        await loadConversations(appSettings);
+        setInputValue('');
+        
+        // Audio read aloud if enabled
+        if (appSettings?.audioEnabled) {
+          voice.speak(
+            responseText.replace(/[⚡⚠️🔍**`]/g, ''),
+            appSettings,
+            () => console.log('Speaking response...'),
+            () => console.log('Response finished.')
+          );
+        }
+        return;
+      }
+
       // Step B: Save user message in local DB (with placeholder image text if present)
       const dbText = imageInput ? `[Uploaded Image: ${imageName}] ${text}` : text;
       const userMsg = await api.saveMessage(currentConvId, 'user', dbText);
@@ -470,6 +538,43 @@ export default function Dashboard() {
     }
   };
 
+  const handleAutoFillForm = async () => {
+    if (!appSettings || !appSettings.formProfile || appSettings.formProfile.length === 0) {
+      alert('Please configure your Auto-Fill Profile variables under Settings first.');
+      return;
+    }
+
+    try {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        const [tab] = await new Promise((resolve) => {
+          chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+        });
+
+        if (tab && tab.id) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'FILL_FORM',
+            profile: appSettings.formProfile
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              alert('Could not fill form. Please reload the active tab first.');
+              return;
+            }
+            if (response && response.success) {
+              alert(`Form auto-fill complete! Filled ${response.filledCount} field(s).`);
+            } else {
+              alert('Auto-fill complete. No matching fields found.');
+            }
+          });
+        }
+      } else {
+        alert('Form auto-fill is only supported inside the Chrome extension sidepanel/popup.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error triggering auto-fill: ' + err.message);
+    }
+  };
+
   const handleGenerateStudyMaterial = async () => {
     setGeneratingStudy(true);
     setStudyError('');
@@ -629,7 +734,17 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="header-right">
+          <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button 
+              onClick={handleAutoFillForm}
+              className="btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '6px 12px', borderRadius: '8px', background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', border: 'none', boxShadow: '0 2px 8px rgba(234, 179, 8, 0.3)', color: 'white', cursor: 'pointer', fontWeight: '600' }}
+              title="Fill Form elements on active webpage using your custom variables profile"
+            >
+              <Zap size={13} />
+              <span>Fill Form</span>
+            </button>
+
             {/* Read Aloud speaker toggle */}
             {appSettings && (
               <button 

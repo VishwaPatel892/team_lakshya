@@ -14,6 +14,7 @@ export default function SettingsModal({ currentSettings, onSave, onClose }) {
   const [voiceRate, setVoiceRate] = useState(currentSettings.voiceRate);
   const [assemblyApiKey, setAssemblyApiKey] = useState(currentSettings.assemblyApiKey || '');
   const [ytExtractionMode, setYtExtractionMode] = useState(currentSettings.ytExtractionMode || 'local');
+  const [formProfile, setFormProfile] = useState(currentSettings.formProfile || []);
 
   const [clearingDb, setClearingDb] = useState(false);
   const [clearSuccess, setClearSuccess] = useState(false);
@@ -30,7 +31,8 @@ export default function SettingsModal({ currentSettings, onSave, onClose }) {
       voiceName,
       voiceRate,
       assemblyApiKey,
-      ytExtractionMode
+      ytExtractionMode,
+      formProfile
     });
     onClose();
   };
@@ -259,6 +261,65 @@ export default function SettingsModal({ currentSettings, onSave, onClose }) {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Form Filler Variables Profile */}
+          <div className="settings-section">
+            <h3><Settings2 size={14} className="sec-icon" /> Auto-Fill Profile & Custom Variables</h3>
+            <span className="input-tip" style={{ marginBottom: '12px', display: 'block' }}>
+              Define variables that LAKSHYA can use to automatically fill out web forms.
+            </span>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              {formProfile.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    type="text" 
+                    value={item.key} 
+                    onChange={(e) => {
+                      const updated = [...formProfile];
+                      updated[idx].key = e.target.value;
+                      setFormProfile(updated);
+                    }}
+                    placeholder="Variable Key (e.g. rollNo)"
+                    className="setting-input"
+                    style={{ flex: 1, minWidth: '80px' }}
+                  />
+                  <input 
+                    type="text" 
+                    value={item.value} 
+                    onChange={(e) => {
+                      const updated = [...formProfile];
+                      updated[idx].value = e.target.value;
+                      setFormProfile(updated);
+                    }}
+                    placeholder="Value (e.g. 108)"
+                    className="setting-input"
+                    style={{ flex: 1.5, minWidth: '100px' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const updated = formProfile.filter((_, i) => i !== idx);
+                      setFormProfile(updated);
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: '4px' }}
+                    title="Remove Variable"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => setFormProfile([...formProfile, { key: '', value: '' }])}
+              className="btn-secondary"
+              style={{ fontSize: '11px', padding: '6px 12px', width: 'fit-content' }}
+            >
+              + Add Custom Variable
+            </button>
           </div>
         </div>
 

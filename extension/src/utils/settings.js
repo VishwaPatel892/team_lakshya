@@ -13,7 +13,13 @@ const DEFAULT_SETTINGS = {
   voiceRate: 1.0,
   savePdfToDb: false,
   ytExtractionMode: 'local',
-  assemblyApiKey: ''
+  assemblyApiKey: '',
+  formProfile: [
+    { key: 'name', value: '' },
+    { key: 'email', value: '' },
+    { key: 'phone', value: '' },
+    { key: 'rollNo', value: '108' }
+  ]
 };
 
 const settings = {
