@@ -693,11 +693,10 @@ Example:
             <button 
               onClick={handleAutoFillForm}
               className="sp-action-btn fill-form-btn"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', border: 'none', color: 'white', fontWeight: 'bold', fontSize: '11px', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', height: '24px' }}
+              style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', borderColor: '#f59e0b', color: '#d97706' }}
               title="Auto-Fill Form"
             >
-              <Zap size={10} fill="white" />
-              <span>Fill Form</span>
+              <Zap size={14} fill="#d97706" />
             </button>
             <button 
               onClick={() => handleNewChat()} 
