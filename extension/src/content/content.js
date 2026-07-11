@@ -77,13 +77,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         let matchedValue = null;
         for (const [key, val] of Object.entries(profileMap)) {
           const cleanKey = key.toLowerCase().trim();
+          if (!cleanKey) continue;
+
           if (
-            nameAttr.includes(cleanKey) ||
-            idAttr.includes(cleanKey) ||
-            placeholderAttr.includes(cleanKey) ||
-            labelText.includes(cleanKey) ||
-            cleanKey.replace(/[^a-z0-9]/g, '').includes(nameAttr.replace(/[^a-z0-9]/g, '')) ||
-            nameAttr.replace(/[^a-z0-9]/g, '').includes(cleanKey.replace(/[^a-z0-9]/g, ''))
+            (nameAttr !== '' && nameAttr.includes(cleanKey)) ||
+            (idAttr !== '' && idAttr.includes(cleanKey)) ||
+            (placeholderAttr !== '' && placeholderAttr.includes(cleanKey)) ||
+            (labelText !== '' && labelText.includes(cleanKey)) ||
+            (nameAttr !== '' && cleanKey.replace(/[^a-z0-9]/g, '').includes(nameAttr.replace(/[^a-z0-9]/g, ''))) ||
+            (nameAttr !== '' && nameAttr.replace(/[^a-z0-9]/g, '').includes(cleanKey.replace(/[^a-z0-9]/g, '')))
           ) {
             matchedValue = val;
             break;
