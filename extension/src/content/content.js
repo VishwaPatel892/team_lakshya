@@ -160,9 +160,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, error: error.message });
     }
   }
+
+  else if (message.type === 'WRITE_CODE') {
+    try {
+      const success = writeCodeIntoEditor(message.code);
+      sendResponse({ success });
+    } catch (error) {
+      sendResponse({ success: false, error: error.message });
+    }
+  }
   
   return true; // Keep channel open for async responses
 });
+
+function writeCodeIntoEditor(codeText) {
+  // Query Monaco Editor (LeetCode/VSCode), CodeMirror, and standard code inputs
+  const textarea = document.querySelector(
+    'textarea.inputarea, .monaco-editor textarea, .CodeMirror textarea, textarea[class*="editor"], textarea[id*="editor"]'
+  );
+
+  if (textarea) {
+    textarea.focus();
+    
+    // Select all code in editor to overwrite it
+    document.execCommand('selectAll', false, null);
+    
+    // Insert/paste the code text
+    const success = document.execCommand('insertText', false, codeText);
+    if (success) {
+      return true;
+    }
+  }
+
+  // Fallback: If no rich text editor, set standard textarea directly
+  const standardTextarea = document.querySelector('textarea, [contenteditable="true"]');
+  if (standardTextarea) {
+    standardTextarea.focus();
+    if (standardTextarea.tagName === 'TEXTAREA') {
+      standardTextarea.value = codeText;
+      standardTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+      standardTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      standardTextarea.innerText = codeText;
+    }
+    return true;
+  }
+  
+  return false;
+}
 
 function getAssociatedLabelText(input) {
   // 1. Check if the input itself has an aria-label

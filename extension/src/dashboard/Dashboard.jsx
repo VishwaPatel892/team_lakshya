@@ -378,6 +378,73 @@ export default function Dashboard() {
                                   cleanText.includes('variable')
                                 ));
 
+      const isWriteCodeRequest = cleanText.includes('write code') || 
+                                 cleanText.includes('insert code') || 
+                                 cleanText.includes('inject code') ||
+                                 cleanText.includes('fill code') ||
+                                 cleanText.includes('put code') ||
+                                 cleanText.includes('write solution') ||
+                                 cleanText.includes('leetcode');
+
+      if (isWriteCodeRequest) {
+        // Find the last assistant code block in messages history
+        let codeToInject = null;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if (m.role === 'assistant') {
+            const matches = m.content.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+            if (matches && matches[1]) {
+              codeToInject = matches[1];
+              break;
+            }
+          }
+        }
+
+        if (codeToInject) {
+          let injectSuccess = false;
+          try {
+            if (typeof chrome !== 'undefined' && chrome.tabs) {
+              const [tab] = await new Promise((resolve) => {
+                chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+              });
+              if (tab && tab.id) {
+                const response = await new Promise((resolve) => {
+                  chrome.tabs.sendMessage(tab.id, {
+                    type: 'WRITE_CODE',
+                    code: codeToInject
+                  }, (res) => {
+                    if (chrome.runtime.lastError) resolve(null);
+                    else resolve(res);
+                  });
+                });
+                if (response && response.success) {
+                  injectSuccess = true;
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Failed to inject code:', err);
+          }
+
+          const dbText = imageInput ? `[Uploaded Image: ${imageName}] ${text}` : text;
+          const userMsg = await api.saveMessage(currentConvId, 'user', dbText);
+
+          let responseText = '';
+          if (injectSuccess) {
+            responseText = `⚡ **Code written successfully!** I extracted the solution from our chat history and injected it directly into the code editor on your active webpage.`;
+          } else {
+            responseText = `⚠️ I could not find a code editor (like Monaco or LeetCode) on your active tab. Make sure you are on a webpage with a code editor open and reload the page.`;
+          }
+
+          const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
+          const history = await api.getConversationMessages(currentConvId);
+          setMessages(history);
+          await loadConversations(appSettings);
+          setInputValue('');
+          return;
+        }
+      }
+
       if (isFormFillRequest) {
         let filledCount = 0;
         let errorOccurred = false;
@@ -553,6 +620,29 @@ Example:
                 () => console.log('Speaking response...'),
                 () => console.log('Response finished.')
               );
+            }
+
+            // Auto-inject code if user requested code writing/fill operations
+            if (isWriteCodeRequest) {
+              const matches = assistantResponse.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+              if (matches && matches[1]) {
+                const codeToInject = matches[1];
+                try {
+                  if (typeof chrome !== 'undefined' && chrome.tabs) {
+                    const [tab] = await new Promise((resolve) => {
+                      chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+                    });
+                    if (tab && tab.id) {
+                      chrome.tabs.sendMessage(tab.id, {
+                        type: 'WRITE_CODE',
+                        code: codeToInject
+                      });
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Failed to auto-inject code:', err);
+                }
+              }
             }
           }
         },
