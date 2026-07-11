@@ -6,6 +6,13 @@ import ChatWindow from '../components/ChatWindow';
 import ModelSelector from '../components/ModelSelector';
 import SettingsModal from '../components/SettingsModal';
 import VoiceController from '../components/VoiceController';
+import { parseBrowserAutomationCommand, runBrowserAutomationCommand } from '../utils/browserAutomation';
+import {
+  findCustomUrlCommand,
+  openCustomUrlCommand,
+  parseSaveCustomUrlCommand,
+  saveCustomUrlCommand
+} from '../utils/customUrlCommands';
 import { 
   Bot, Plus, Settings, MessageSquare, Trash2, Send, 
   FileText, Server, AlertCircle, Sparkles, BookOpen, Camera, X, Table, Paperclip, RefreshCw, Video, Zap
@@ -272,6 +279,92 @@ export default function Dashboard() {
         setConversations(prev => [newConv, ...prev]);
       }
 
+      const customSaveCommand = parseSaveCustomUrlCommand(text, activeTabContext);
+      if (customSaveCommand) {
+        const userMsg = await api.saveMessage(currentConvId, 'user', text);
+        setMessages(prev => [...prev, userMsg]);
+
+        let responseText = '';
+        if (customSaveCommand.needsUrl) {
+          responseText = 'I can save that custom command. Please include the URL, or open the page first and say: "remember this URL as open my portfolio".';
+        } else {
+          const savedCommand = await saveCustomUrlCommand(customSaveCommand.phrase, customSaveCommand.url);
+          responseText = `Saved custom command: "${savedCommand.phrase}" will open ${savedCommand.url}.`;
+        }
+
+        const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
+        setMessages(prev => [...prev, aiMsg]);
+        await loadConversations(appSettings);
+
+        if (appSettings?.audioEnabled) {
+          voice.speak(
+            responseText,
+            appSettings,
+            () => console.log('Speaking response...'),
+            () => console.log('Response finished.')
+          );
+        }
+        return;
+      }
+
+      const customOpenCommand = await findCustomUrlCommand(text);
+      if (customOpenCommand) {
+        const userMsg = await api.saveMessage(currentConvId, 'user', text);
+        setMessages(prev => [...prev, userMsg]);
+
+        let responseText = '';
+        try {
+          const result = await openCustomUrlCommand(customOpenCommand);
+          responseText = `Opening "${customOpenCommand.phrase}" at ${result.url}.`;
+        } catch (err) {
+          console.error('Custom URL command failed:', err);
+          responseText = `I found "${customOpenCommand.phrase}", but could not open it: ${err.message}`;
+        }
+
+        const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
+        setMessages(prev => [...prev, aiMsg]);
+        await loadConversations(appSettings);
+
+        if (appSettings?.audioEnabled) {
+          voice.speak(
+            responseText,
+            appSettings,
+            () => console.log('Speaking response...'),
+            () => console.log('Response finished.')
+          );
+        }
+        return;
+      }
+
+      const automationCommand = parseBrowserAutomationCommand(text);
+      if (automationCommand) {
+        const userMsg = await api.saveMessage(currentConvId, 'user', text);
+        setMessages(prev => [...prev, userMsg]);
+
+        let responseText = '';
+        try {
+          const result = await runBrowserAutomationCommand(automationCommand);
+          responseText = `Opening ${result.siteLabel} and searching for "${result.query}".`;
+        } catch (err) {
+          console.error('Browser automation failed:', err);
+          responseText = `I could not open ${automationCommand.siteLabel} automatically: ${err.message}`;
+        }
+
+        const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
+        setMessages(prev => [...prev, aiMsg]);
+        await loadConversations(appSettings);
+
+        if (appSettings?.audioEnabled) {
+          voice.speak(
+            responseText,
+            appSettings,
+            () => console.log('Speaking response...'),
+            () => console.log('Response finished.')
+          );
+        }
+        return;
+      }
+
       // Check if user is requesting a form fill action (more flexible keyword matching)
       const cleanText = text.toLowerCase().trim();
       const isFormFillRequest = cleanText.includes('autofill') || 
@@ -382,7 +475,7 @@ Example:
         const aiMsg = await api.saveMessage(currentConvId, 'assistant', responseText);
         
         // Refresh message logs in UI view
-        const history = await api.getConversationMessages(currentConvId);
+        const history = await api.getMessages(currentConvId);
         setMessages(history);
         await loadConversations(appSettings);
         setInputValue('');
